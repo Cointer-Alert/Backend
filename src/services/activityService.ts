@@ -86,7 +86,12 @@ export function getWalletValue(personalKeyId: string, limitRaw?: string, cursorR
   };
 }
 
-const SUMMARY_WINDOWS = { "24h": 86_400, "7d": 604_800, "30d": 2_592_000 } as const;
+const SUMMARY_WINDOWS = {
+  "24h": 86_400,
+  "7d": 604_800,
+  "30d": 2_592_000,
+  "1y": 31_536_000,
+} as const;
 
 export function getActivitySummary(personalKeyId: string) {
   const rows = getDb()

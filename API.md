@@ -379,7 +379,8 @@ Aggregates your retained activity (retention period is in `GET /capabilities`). 
   "windows": {
     "24h": { "count": 3, "fiatTotal": 123.45, "unpricedCount": 0 },
     "7d": { "count": 9, "fiatTotal": 512.0, "unpricedCount": 1 },
-    "30d": { "count": 20, "fiatTotal": 1490.9, "unpricedCount": 2 }
+    "30d": { "count": 20, "fiatTotal": 1490.9, "unpricedCount": 2 },
+    "1y": { "count": 84, "fiatTotal": 6021.4, "unpricedCount": 2 }
   },
   "assets": [
     { "chain": "bitcoin", "asset": "BTC", "count": 5, "amount": "0.523", "fiatValue": 52300.0 }

@@ -44,7 +44,7 @@ activity.get("/value", requireAuth, perKeyRateLimit, (c) => {
 
 /**
  * Aggregates the key's retained activity into fixed time windows (24h, 7d,
- * 30d) with deposit counts and fiat totals, plus per-asset totals over all
+ * 30d, 1y) with deposit counts and fiat totals, plus per-asset totals over all
  * retained rows. Assets without a fresh cached price get a null fiatValue and
  * are excluded from window totals (counted in unpricedCount instead).
  * Requires authentication.
