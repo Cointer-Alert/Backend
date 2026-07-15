@@ -38,7 +38,7 @@ addresses.get("/", (c) => {
  * @param {string} body.address - Address to watch, normalized to the chain's canonical form.
  * @param {string} [body.label] - Optional display label.
  * @returns {201} The created address record.
- * @returns {400} Invalid JSON body, chain, address, or label.
+ * @returns {400} Invalid JSON body, chain, address, label, or address limit reached (admin keys are exempt from the limit).
  */
 addresses.post("/", async (c) => {
   let body: Record<string, unknown>;
@@ -48,7 +48,13 @@ addresses.post("/", async (c) => {
     return c.json({ error: "Invalid JSON body" }, 400);
   }
   try {
-    const created = addAddress(c.get("personalKeyId"), body.chain, body.address, body.label);
+    const created = addAddress(
+      c.get("personalKeyId"),
+      body.chain,
+      body.address,
+      body.label,
+      c.get("isAdmin"),
+    );
     void seedAddressHistory(created.chain, c.get("personalKeyId"), created.address);
     return c.json(created, 201);
   } catch (err) {

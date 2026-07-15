@@ -60,7 +60,8 @@ activity.get("/summary", requireAuth, perKeyRateLimit, (c) => {
  * Totals the key's incoming transfers for one calendar month (UTC): deposit
  * count, fiat total, and per-asset breakdowns. Defaults to the current month.
  * Months outside the activity retention window return empty or partial
- * totals. Assets without a fresh cached price get a null fiatValue and are
+ * totals (admin keys are exempt from retention, so all their months stay
+ * complete). Assets without a fresh cached price get a null fiatValue and are
  * excluded from fiatTotal (counted in unpricedCount instead). Requires
  * authentication.
  *

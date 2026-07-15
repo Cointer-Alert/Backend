@@ -6,6 +6,7 @@
     "start": "bun run starter.ts",
     "dev": "bun run --watch starter.ts",
     "test": "bun test",
+    "hash-key": "bun run scripts/hash-key.ts",
     "typecheck": "bunx tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

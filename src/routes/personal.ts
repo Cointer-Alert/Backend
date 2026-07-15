@@ -26,19 +26,22 @@ personal.post("/", keyMintRateLimit, (c) => {
 
 /**
  * Returns the full account configuration (addresses, channels, push tokens)
- * for the restore/sync flow. Never includes the key itself. Requires
- * authentication.
+ * for the restore/sync flow, plus the key's admin status and effective
+ * limits (null means unlimited / kept forever). Never includes the key
+ * itself. Requires authentication.
  *
  * @route GET /personal
  * @returns {200} The account configuration.
  */
 personal.get("/", requireAuth, perKeyRateLimit, (c) => {
-  return c.json(getPersonalConfig(c.get("personalKeyId")));
+  return c.json(getPersonalConfig(c.get("personalKeyId"), c.get("isAdmin")));
 });
 
 /**
  * Issues a fresh personal key for the same account; the old key stops
- * working immediately. Requires authentication.
+ * working immediately. Rotating an admin key drops its admin status until
+ * the server's ADMIN_KEY_HASHES is updated with the new key's hash.
+ * Requires authentication.
  *
  * @route POST /personal/rotate
  * @returns {200} The replacement personal key.

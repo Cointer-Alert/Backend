@@ -243,7 +243,16 @@ export function recordActivity(
 
 export function pruneOldActivity(): void {
   const cutoff = now() - env.limits.activityRetentionDays * 86_400;
-  const res = getDb().run("DELETE FROM activity WHERE created_at < ?", [cutoff]);
+  const adminHashes = [...env.adminKeyHashes];
+  const res =
+    adminHashes.length === 0
+      ? getDb().run("DELETE FROM activity WHERE created_at < ?", [cutoff])
+      : getDb().run(
+          `DELETE FROM activity WHERE created_at < ? AND personal_key_id NOT IN (
+             SELECT id FROM personal_keys WHERE key_hash IN (${adminHashes.map(() => "?").join(", ")})
+           )`,
+          [cutoff, ...adminHashes],
+        );
   if (res.changes > 0) console.log(`[retention] pruned ${res.changes} activity rows`);
 }
 

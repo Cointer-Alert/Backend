@@ -1,4 +1,5 @@
 import { createMiddleware } from "hono/factory";
+import { env } from "../config/env";
 import { getDb, now } from "../db/client";
 import type { AppEnv } from "../types";
 
@@ -18,11 +19,12 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
     return c.json({ error: "Invalid personal key" }, 401);
   }
 
+  const keyHash = hashPersonalKey(key);
   const row = getDb()
     .query<{ id: string; last_seen_at: number }, [string]>(
       "SELECT id, last_seen_at FROM personal_keys WHERE key_hash = ?",
     )
-    .get(hashPersonalKey(key));
+    .get(keyHash);
   if (!row) {
     return c.json({ error: "Invalid personal key" }, 401);
   }
@@ -33,5 +35,6 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   }
 
   c.set("personalKeyId", row.id);
+  c.set("isAdmin", env.adminKeyHashes.has(keyHash));
   await next();
 });

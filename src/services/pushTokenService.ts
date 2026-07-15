@@ -21,7 +21,12 @@ export function listPushTokens(personalKeyId: string) {
   }));
 }
 
-export function registerPushToken(personalKeyId: string, token: unknown, platform: unknown) {
+export function registerPushToken(
+  personalKeyId: string,
+  token: unknown,
+  platform: unknown,
+  isAdmin = false,
+) {
   if (typeof token !== "string" || !EXPO_TOKEN_RE.test(token)) {
     throw new ValidationError("token must be an Expo push token (ExponentPushToken[...])");
   }
@@ -37,13 +42,15 @@ export function registerPushToken(personalKeyId: string, token: unknown, platfor
     .get(personalKeyId, token);
   if (existing) return { id: existing.id, token, platform };
 
-  const count = db
-    .query<{ n: number }, [string]>(
-      "SELECT COUNT(*) AS n FROM push_tokens WHERE personal_key_id = ?",
-    )
-    .get(personalKeyId)!.n;
-  if (count >= env.limits.maxPushTokensPerKey) {
-    throw new ValidationError(`Push token limit reached (${env.limits.maxPushTokensPerKey})`);
+  if (!isAdmin) {
+    const count = db
+      .query<{ n: number }, [string]>(
+        "SELECT COUNT(*) AS n FROM push_tokens WHERE personal_key_id = ?",
+      )
+      .get(personalKeyId)!.n;
+    if (count >= env.limits.maxPushTokensPerKey) {
+      throw new ValidationError(`Push token limit reached (${env.limits.maxPushTokensPerKey})`);
+    }
   }
 
   const id = crypto.randomUUID();

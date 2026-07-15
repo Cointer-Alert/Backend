@@ -4,6 +4,7 @@ export type AppEnv = {
   };
   Variables: {
     personalKeyId: string;
+    isAdmin: boolean;
   };
 };
 

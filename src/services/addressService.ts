@@ -24,6 +24,7 @@ export function addAddress(
   chainId: unknown,
   rawAddress: unknown,
   label: unknown,
+  isAdmin = false,
 ) {
   if (typeof chainId !== "string") throw new ValidationError("chain is required");
   const chain = getChain(chainId);
@@ -44,11 +45,15 @@ export function addAddress(
     .get(personalKeyId, chain.id, address);
   if (dupe) throw new ValidationError("You are already watching this address");
 
-  const count = db
-    .query<{ n: number }, [string]>("SELECT COUNT(*) AS n FROM addresses WHERE personal_key_id = ?")
-    .get(personalKeyId)!.n;
-  if (count >= env.limits.maxAddressesPerKey) {
-    throw new ValidationError(`Address limit reached (${env.limits.maxAddressesPerKey})`);
+  if (!isAdmin) {
+    const count = db
+      .query<{ n: number }, [string]>(
+        "SELECT COUNT(*) AS n FROM addresses WHERE personal_key_id = ?",
+      )
+      .get(personalKeyId)!.n;
+    if (count >= env.limits.maxAddressesPerKey) {
+      throw new ValidationError(`Address limit reached (${env.limits.maxAddressesPerKey})`);
+    }
   }
 
   const id = crypto.randomUUID();

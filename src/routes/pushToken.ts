@@ -15,7 +15,7 @@ pushToken.use("*", requireAuth, perKeyRateLimit);
  * @param {string} body.token - Expo push token (ExponentPushToken[...]).
  * @param {string} body.platform - Device platform: "ios" or "android".
  * @returns {201} The registered push token record.
- * @returns {400} Invalid JSON body, token, or platform.
+ * @returns {400} Invalid JSON body, token, platform, or push token limit reached (admin keys are exempt from the limit).
  */
 pushToken.post("/", async (c) => {
   let body: Record<string, unknown>;
@@ -25,7 +25,10 @@ pushToken.post("/", async (c) => {
     return c.json({ error: "Invalid JSON body" }, 400);
   }
   try {
-    return c.json(registerPushToken(c.get("personalKeyId"), body.token, body.platform), 201);
+    return c.json(
+      registerPushToken(c.get("personalKeyId"), body.token, body.platform, c.get("isAdmin")),
+      201,
+    );
   } catch (err) {
     if (err instanceof ValidationError) return c.json({ error: err.message }, 400);
     throw err;

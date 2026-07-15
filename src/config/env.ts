@@ -106,6 +106,23 @@ function loadCloudflareEmail(): CloudflareEmailEnv | null {
   return { accountId, apiToken, from };
 }
 
+function loadAdminKeyHashes(): Set<string> {
+  const raw = process.env.ADMIN_KEY_HASHES?.trim();
+  if (!raw) return new Set();
+  const hashes = raw
+    .split(",")
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean);
+  for (const hash of hashes) {
+    if (!/^[0-9a-f]{64}$/.test(hash)) {
+      throw new Error(
+        `Invalid ADMIN_KEY_HASHES entry "${hash}", expected a 64-char SHA-256 hex hash (see scripts/hash-key.ts)`,
+      );
+    }
+  }
+  return new Set(hashes);
+}
+
 function loadSmtp(): SmtpEnv | null {
   const host = process.env.SMTP_HOST;
   if (!host) return null;
@@ -167,6 +184,8 @@ export const env = {
     maxPushTokensPerKey: int("MAX_PUSH_TOKENS_PER_KEY", 10),
     activityRetentionDays: int("ACTIVITY_RETENTION_DAYS", 90),
   },
+
+  adminKeyHashes: loadAdminKeyHashes(),
 };
 
 if (env.limits.activityRetentionDays <= env.ingest.maxAgeDays) {

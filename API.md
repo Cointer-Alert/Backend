@@ -25,6 +25,10 @@ Auth failures return 401 with `Missing bearer token` (no or bad header) or `Inva
 
 Public routes (no key needed): `POST /personal`, `GET /chains`, `GET /stats/wallets`, `GET /capabilities`, `GET /health`. Everything else needs the bearer key.
 
+### Admin keys
+
+The server operator can grant a key admin status by adding its SHA-256 hash to the `ADMIN_KEY_HASHES` env var (generate the hash with `bun run hash-key ck_<key>`). Admin keys have no address/channel/push-token limits and their activity is never pruned. `GET /personal` reports the status via `isAdmin` and `limits` (`null` = unlimited). There is no API to grant or revoke admin status. Rotating an admin key produces a new hash, so it loses admin status until `ADMIN_KEY_HASHES` is updated with the new hash.
+
 ## Rate limits
 
 | Scope                              | Limit        |
@@ -54,13 +58,20 @@ Save it. It is never shown again.
 
 ### GET /personal
 
-Auth required. Returns the full account config. Never includes the key itself.
+Auth required. Returns the full account config, plus the key's admin status and effective limits. Never includes the key itself.
 
 **200**
 
 ```json
 {
   "createdAt": 1712345678,
+  "isAdmin": false,
+  "limits": {
+    "maxAddresses": 10,
+    "maxChannels": 10,
+    "maxPushTokens": 10,
+    "activityRetentionDays": 90
+  },
   "addresses": [
     {
       "id": "uuid",
@@ -86,9 +97,11 @@ Auth required. Returns the full account config. Never includes the key itself.
 }
 ```
 
+For admin keys `isAdmin` is `true` and every value in `limits` is `null` (unlimited / kept forever).
+
 ### POST /personal/rotate
 
-Auth required. No body. Issues a replacement key for the same account. The old key stops working immediately.
+Auth required. No body. Issues a replacement key for the same account. The old key stops working immediately. An admin key that is rotated loses admin status until the server's `ADMIN_KEY_HASHES` is updated (see Admin keys).
 
 **200** `{ "personalKey": "ck_..." }`
 
@@ -138,7 +151,7 @@ Body:
 
 **201** `{ "id": "uuid", "chain": "bitcoin", "address": "bc1q...", "label": "Cold wallet", "createdAt": 1712345678 }`
 
-**400** unsupported chain, invalid address, bad label, duplicate (`You are already watching this address`), or `Address limit reached (10)`.
+**400** unsupported chain, invalid address, bad label, duplicate (`You are already watching this address`), or `Address limit reached (10)`. Admin keys are exempt from the limit.
 
 ### PATCH /addresses/:addressId
 
@@ -240,7 +253,7 @@ Creates a channel. Body: `type` (string) and `config` (object, validated per typ
 | `email`   | `{ "to": "you@example.com" }`                       | Only available if the server has email configured (check `GET /capabilities`)                 |
 
 **201** the created channel (preview shape, as in GET).
-**400** bad type/config, private/local URLs rejected, or `Channel limit reached (10)`.
+**400** bad type/config, private/local URLs rejected, or `Channel limit reached (10)`. Admin keys are exempt from the limit.
 
 ### PATCH /channels/:channelId
 
@@ -280,7 +293,7 @@ Body:
 
 **201** `{ "id": "uuid", "token": "ExponentPushToken[...]", "platform": "ios" }`. Registering the same token twice returns the existing record.
 
-**400** invalid token format, bad platform, or `Push token limit reached (10)`.
+**400** invalid token format, bad platform, or `Push token limit reached (10)`. Admin keys are exempt from the limit.
 
 ### DELETE /push-token/:tokenId
 
@@ -402,7 +415,7 @@ Query params:
 }
 ```
 
-Deposits are priced at current cached prices, not the price at time of receipt. Items with no fresh price are left out of `fiatTotal` and counted in `unpricedCount` (`fiatValue: null` for fully unpriced assets). Only retained activity is counted (see `activityRetentionDays` in `GET /capabilities`), so months older than the retention window come back empty or partial.
+Deposits are priced at current cached prices, not the price at time of receipt. Items with no fresh price are left out of `fiatTotal` and counted in `unpricedCount` (`fiatValue: null` for fully unpriced assets). Only retained activity is counted (see `activityRetentionDays` in `GET /capabilities`), so months older than the retention window come back empty or partial. Admin keys are exempt from retention, so all their months stay complete.
 
 **400** `{ "error": "month must be in YYYY-MM format" }`
 
@@ -442,6 +455,8 @@ Server configuration: whether the `email` channel type is available, the fiat cu
   }
 }
 ```
+
+These are the server-wide defaults. The effective limits for a specific key (admin keys are unlimited) are in `GET /personal`.
 
 ### GET /health
 

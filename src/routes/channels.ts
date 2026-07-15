@@ -34,7 +34,7 @@ channels.get("/", (c) => {
  * @param {string} body.type - Channel type: "ntfy", "discord", "slack", or "email".
  * @param {object} body.config - Type-specific configuration (validated per type).
  * @returns {201} The created channel.
- * @returns {400} Invalid JSON body, type, config, or channel limit reached.
+ * @returns {400} Invalid JSON body, type, config, or channel limit reached (admin keys are exempt from the limit).
  */
 channels.post("/", async (c) => {
   let body: Record<string, unknown>;
@@ -44,7 +44,10 @@ channels.post("/", async (c) => {
     return c.json({ error: "Invalid JSON body" }, 400);
   }
   try {
-    return c.json(addChannel(c.get("personalKeyId"), body.type, body.config), 201);
+    return c.json(
+      addChannel(c.get("personalKeyId"), body.type, body.config, c.get("isAdmin")),
+      201,
+    );
   } catch (err) {
     if (err instanceof ValidationError) return c.json({ error: err.message }, 400);
     throw err;

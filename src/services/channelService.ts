@@ -143,16 +143,20 @@ export function getChannel(personalKeyId: string, channelId: string): ChannelRow
   );
 }
 
-export function addChannel(personalKeyId: string, type: unknown, config: unknown) {
+export function addChannel(personalKeyId: string, type: unknown, config: unknown, isAdmin = false) {
   if (typeof type !== "string" || !CHANNEL_TYPES.has(type as ChannelType)) {
     throw new ValidationError(`type must be one of: ${[...CHANNEL_TYPES].join(", ")}`);
   }
   const db = getDb();
-  const count = db
-    .query<{ n: number }, [string]>("SELECT COUNT(*) AS n FROM channels WHERE personal_key_id = ?")
-    .get(personalKeyId)!.n;
-  if (count >= env.limits.maxChannelsPerKey) {
-    throw new ValidationError(`Channel limit reached (${env.limits.maxChannelsPerKey})`);
+  if (!isAdmin) {
+    const count = db
+      .query<{ n: number }, [string]>(
+        "SELECT COUNT(*) AS n FROM channels WHERE personal_key_id = ?",
+      )
+      .get(personalKeyId)!.n;
+    if (count >= env.limits.maxChannelsPerKey) {
+      throw new ValidationError(`Channel limit reached (${env.limits.maxChannelsPerKey})`);
+    }
   }
 
   const configJson = validateChannelConfig(type as ChannelType, config);
