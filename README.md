@@ -12,7 +12,7 @@
 
 ## Overview
 
-This is the backend for Cointer. It watches Bitcoin and Ethereum addresses on the blockchain. When a watched address gets a deposit, it sends a notification through the channels you set up. There are no accounts or passwords. You get a single personal key, and everything you add is tied to that key.
+This is the backend for Cointer. It watches Bitcoin, Ethereum, Base, Solana, Litecoin, Bitcoin Cash, and Monero addresses on the blockchain. When a watched address gets a deposit, it sends a notification through the channels you set up. There are no accounts or passwords. You get a single personal key, and everything you add is tied to that key.
 
 <br />
 
@@ -28,8 +28,8 @@ No email or password. You get a key when you sign up. Use it to log in on any de
 </td>
 <td width="50%" valign="top">
 
-**Watch Bitcoin and Ethereum Addresses:**
-Add up to 10 addresses per key. Supports Bitcoin and Ethereum, including tokens like USDC, USDT, and DAI. Old transactions are skipped so you only get notified about new deposits.
+**Watch Seven Chains:**
+Add up to 10 addresses per key. Supports Bitcoin, Ethereum, Base, Solana, Litecoin, Bitcoin Cash, and Monero, including tokens like USDC, USDT, DAI, and EURC on Ethereum/Base/Solana. Old transactions are skipped so you only get notified about new deposits.
 
 </td>
 </tr>
@@ -37,7 +37,7 @@ Add up to 10 addresses per key. Supports Bitcoin and Ethereum, including tokens 
 <td width="50%" valign="top">
 
 **On-Chain Watchers:**
-Checks Bitcoin every 30 seconds and Ethereum every 15 seconds for new deposits to your saved addresses.
+Polls each chain on its own interval (roughly every 15-60 seconds, longer for Bitcoin Cash and Monero) for new deposits to your saved addresses. Monero uses a private view key you provide, scanned through a local `monero-wallet-rpc` process — see [API.md](API.md) for details.
 
 </td>
 <td width="50%" valign="top">

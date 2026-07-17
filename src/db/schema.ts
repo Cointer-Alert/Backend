@@ -58,6 +58,16 @@ export function applySchema(db: Database): void {
       updated_at  INTEGER NOT NULL
     );
 
+    -- Per-address cursor, for chains (e.g. Solana) where progress is tracked
+    -- per watched address rather than a single chain-wide block cursor.
+    CREATE TABLE IF NOT EXISTS ingest_address_state (
+      chain       TEXT NOT NULL,
+      address     TEXT NOT NULL,
+      cursor      TEXT NOT NULL,
+      updated_at  INTEGER NOT NULL,
+      PRIMARY KEY (chain, address)
+    );
+
     -- Per-wallet notification opt-outs: a row means "this address does NOT
     -- notify via this channel". Absence of a row = enabled, so new channels
     -- and new addresses default to all notifications on.
@@ -71,6 +81,15 @@ export function applySchema(db: Database): void {
     -- Same opt-out semantics for Expo push, muted per address across all devices.
     CREATE TABLE IF NOT EXISTS address_push_mutes (
       address_id  TEXT PRIMARY KEY REFERENCES addresses(id) ON DELETE CASCADE,
+      created_at  INTEGER NOT NULL
+    );
+
+    -- Monero addresses require a private VIEW key (never a spend key) to scan
+    -- for incoming transfers. Kept in a dedicated table, not the shared
+    -- addresses table, since no other chain has an equivalent secret.
+    CREATE TABLE IF NOT EXISTS monero_watch_keys (
+      address_id  TEXT PRIMARY KEY REFERENCES addresses(id) ON DELETE CASCADE,
+      view_key    TEXT NOT NULL,
       created_at  INTEGER NOT NULL
     );
   `);

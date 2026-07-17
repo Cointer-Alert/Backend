@@ -143,15 +143,18 @@ Starts watching an address. Existing on-chain history is seeded in the backgroun
 
 Body:
 
-| Field     | Type   | Required | Notes                                                      |
-| --------- | ------ | -------- | ---------------------------------------------------------- |
-| `chain`   | string | yes      | A chain id from `GET /chains` (e.g. `bitcoin`, `ethereum`) |
-| `address` | string | yes      | Validated and normalized per chain                         |
-| `label`   | string | no       | Max 100 chars                                              |
+| Field     | Type   | Required                   | Notes                                                                                                              |
+| --------- | ------ | -------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `chain`   | string | yes                        | A chain id from `GET /chains` (e.g. `bitcoin`, `ethereum`, `base`, `solana`, `litecoin`, `bitcoin-cash`, `monero`) |
+| `address` | string | yes                        | Validated and normalized per chain                                                                                 |
+| `label`   | string | no                         | Max 100 chars                                                                                                      |
+| `viewKey` | string | only for `chain: "monero"` | The address's private **view** key (64-char hex). Never send a spend key.                                          |
+
+Monero deposits can't be detected from the address alone — a private view key is required to scan for incoming transfers (see the [Backend README](README.md) for why). The server never needs and should never be given a spend key.
 
 **201** `{ "id": "uuid", "chain": "bitcoin", "address": "bc1q...", "label": "Cold wallet", "createdAt": 1712345678 }`
 
-**400** unsupported chain, invalid address, bad label, duplicate (`You are already watching this address`), or `Address limit reached (10)`. Admin keys are exempt from the limit.
+**400** unsupported chain, invalid address, bad label, missing/malformed `viewKey` for Monero, duplicate (`You are already watching this address`), or `Address limit reached (10)`. Admin keys are exempt from the limit.
 
 ### PATCH /addresses/:addressId
 
@@ -428,9 +431,25 @@ No auth on any of these.
 
 ### GET /chains
 
-Chains supported by the server. Use the `id` values for `POST /addresses`.
+Chains supported by the server (depends on the server's `ENABLED_CHAINS` config). Use the `id` values for `POST /addresses`.
 
-**200** `{ "chains": [ { "id": "bitcoin", "name": "Bitcoin", "asset": "BTC" } ] }`
+**200**
+
+```json
+{
+  "chains": [
+    { "id": "bitcoin", "name": "Bitcoin", "asset": "BTC" },
+    { "id": "ethereum", "name": "Ethereum", "asset": "ETH" },
+    { "id": "base", "name": "Base", "asset": "ETH" },
+    { "id": "solana", "name": "Solana", "asset": "SOL" },
+    { "id": "litecoin", "name": "Litecoin", "asset": "LTC" },
+    { "id": "bitcoin-cash", "name": "Bitcoin Cash", "asset": "BCH" },
+    { "id": "monero", "name": "Monero", "asset": "XMR" }
+  ]
+}
+```
+
+Chains that support multiple assets (Ethereum, Base, and Solana can watch native-coin deposits plus configured tokens like USDC/USDT/DAI/EURC) share one `chain` id — the specific asset received shows up in the `asset` field of each `activity` item, not in `GET /chains`.
 
 ### GET /stats/wallets
 

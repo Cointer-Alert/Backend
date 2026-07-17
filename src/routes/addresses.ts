@@ -37,8 +37,10 @@ addresses.get("/", (c) => {
  * @param {string} body.chain - Chain id (see GET /chains).
  * @param {string} body.address - Address to watch, normalized to the chain's canonical form.
  * @param {string} [body.label] - Optional display label.
+ * @param {string} [body.viewKey] - Required for chain "monero": the address's private VIEW key
+ *   (64-char hex, never a spend key), needed to detect incoming transfers.
  * @returns {201} The created address record.
- * @returns {400} Invalid JSON body, chain, address, label, or address limit reached (admin keys are exempt from the limit).
+ * @returns {400} Invalid JSON body, chain, address, label, viewKey, or address limit reached (admin keys are exempt from the limit).
  */
 addresses.post("/", async (c) => {
   let body: Record<string, unknown>;
@@ -54,8 +56,14 @@ addresses.post("/", async (c) => {
       body.address,
       body.label,
       c.get("isAdmin"),
+      body.viewKey,
     );
-    void seedAddressHistory(created.chain, c.get("personalKeyId"), created.address);
+    void seedAddressHistory(
+      created.chain,
+      c.get("personalKeyId"),
+      created.address,
+      typeof body.viewKey === "string" ? body.viewKey : undefined,
+    );
     return c.json(created, 201);
   } catch (err) {
     if (err instanceof ValidationError) return c.json({ error: err.message }, 400);

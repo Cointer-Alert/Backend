@@ -33,24 +33,45 @@ export function formatFiat(value: number): string {
   return `${symbol}${formatted}${suffix}`;
 }
 
+/** Chains whose tokens can be priced via CoinGecko's per-platform token_price endpoint. */
+const TOKEN_PLATFORMS: { chainId: string; platformId: string }[] = [
+  { chainId: "ethereum", platformId: "ethereum" },
+  { chainId: "base", platformId: "base" },
+  { chainId: "solana", platformId: "solana" },
+];
+
+function tokensForChain(chainId: string): { ticker: string; address: string }[] {
+  switch (chainId) {
+    case "ethereum":
+      return env.ingest.ethereumErc20Tokens;
+    case "base":
+      return env.ingest.baseErc20Tokens;
+    case "solana":
+      return env.ingest.solanaSplTokens;
+    default:
+      return [];
+  }
+}
+
 function targets(): {
   byId: { ticker: string; id: string }[];
-  byAddress: { ticker: string; address: string }[];
+  byAddress: { platformId: string; ticker: string; address: string }[];
 } {
   const byId = new Map<string, string>();
-  const byAddress: { ticker: string; address: string }[] = [];
+  const byAddress: { platformId: string; ticker: string; address: string }[] = [];
 
   for (const chain of getEnabledChains()) {
     const ticker = chain.asset.toUpperCase();
     const id = env.prices.coinIds[ticker];
     if (id) byId.set(ticker, id);
   }
-  if (env.enabledChains.includes("ethereum")) {
-    for (const token of env.ingest.ethereumErc20Tokens) {
+  for (const { chainId, platformId } of TOKEN_PLATFORMS) {
+    if (!env.enabledChains.includes(chainId)) continue;
+    for (const token of tokensForChain(chainId)) {
       const ticker = token.ticker.toUpperCase();
       const id = env.prices.coinIds[ticker];
       if (id) byId.set(ticker, id);
-      else byAddress.push({ ticker, address: token.address });
+      else byAddress.push({ platformId, ticker, address: token.address });
     }
   }
   return { byId: [...byId].map(([ticker, id]) => ({ ticker, id })), byAddress };
@@ -59,29 +80,43 @@ function targets(): {
 async function refreshPrices(): Promise<void> {
   const { byId, byAddress } = targets();
 
-  const [idRes, addressRes] = await Promise.allSettled([
+  const addressesByPlatform = new Map<string, { ticker: string; address: string }[]>();
+  for (const t of byAddress) {
+    const list = addressesByPlatform.get(t.platformId) ?? [];
+    list.push({ ticker: t.ticker, address: t.address });
+    addressesByPlatform.set(t.platformId, list);
+  }
+  const platforms = [...addressesByPlatform.entries()];
+
+  const results = await Promise.allSettled([
     fetchNativePrices(byId.map((t) => t.id)),
-    fetchTokenPrices(byAddress.map((t) => t.address)),
+    ...platforms.map(([platformId, tokens]) =>
+      fetchTokenPrices(
+        platformId,
+        tokens.map((t) => t.address),
+      ),
+    ),
   ]);
 
   const fetchedAt = Date.now();
+  const [idRes, ...addressResults] = results;
 
-  if (idRes.status === "fulfilled") {
+  if (idRes!.status === "fulfilled") {
     for (const { ticker, id } of byId) {
-      const value = idRes.value[id];
+      const value = idRes!.value[id];
       if (value !== undefined) cache.set(ticker, { value, fetchedAt });
     }
   }
-  if (addressRes.status === "fulfilled") {
-    for (const { ticker, address } of byAddress) {
-      const value = addressRes.value[address];
+  addressResults.forEach((res, i) => {
+    if (res.status !== "fulfilled") return;
+    const tokens = platforms[i]![1];
+    for (const { ticker, address } of tokens) {
+      const value = res.value[address];
       if (value !== undefined) cache.set(ticker, { value, fetchedAt });
     }
-  }
+  });
 
-  const failed = [idRes, addressRes].find(
-    (r): r is PromiseRejectedResult => r.status === "rejected",
-  );
+  const failed = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
   if (failed) throw failed.reason;
 }
 

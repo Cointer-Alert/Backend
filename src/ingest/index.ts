@@ -1,6 +1,12 @@
 import { env } from "../config/env";
+import { pollBase } from "./baseWatcher";
 import { pollBitcoin, seedBitcoinAddress } from "./bitcoinWatcher";
+import { pollBitcoinCash, seedBitcoinCashAddress } from "./bitcoinCashWatcher";
 import { pollEthereum } from "./ethereumWatcher";
+import { pollLitecoin, seedLitecoinAddress } from "./litecoinWatcher";
+import { pollMonero, seedMoneroAddress } from "./moneroWatcher";
+import { stopWalletRpc } from "./moneroWalletRpc";
+import { pollSolana, seedSolanaAddress } from "./solanaWatcher";
 
 interface Watcher {
   chainId: string;
@@ -11,6 +17,14 @@ interface Watcher {
 const watchers: Record<string, Omit<Watcher, "chainId">> = {
   bitcoin: { intervalMs: env.ingest.bitcoinPollIntervalMs, poll: pollBitcoin },
   ethereum: { intervalMs: env.ingest.ethereumPollIntervalMs, poll: pollEthereum },
+  litecoin: { intervalMs: env.ingest.litecoinPollIntervalMs, poll: pollLitecoin },
+  base: { intervalMs: env.ingest.basePollIntervalMs, poll: pollBase },
+  solana: { intervalMs: env.ingest.solanaPollIntervalMs, poll: pollSolana },
+  "bitcoin-cash": {
+    intervalMs: env.ingest.bitcoinCashPollIntervalMs,
+    poll: pollBitcoinCash,
+  },
+  monero: { intervalMs: env.ingest.moneroPollIntervalMs, poll: pollMonero },
 };
 
 const MAX_BACKOFF_MS = 5 * 60_000;
@@ -65,16 +79,24 @@ export function startWatchers(): void {
 export function stopWatchers(): void {
   for (const stop of stops) stop();
   stops = [];
+  stopWalletRpc();
 }
 
 export async function seedAddressHistory(
   chainId: string,
   personalKeyId: string,
   address: string,
+  moneroViewKey?: string,
 ): Promise<void> {
   if (!env.ingest.watchersEnabled) return;
   try {
     if (chainId === "bitcoin") await seedBitcoinAddress(personalKeyId, address);
+    if (chainId === "litecoin") await seedLitecoinAddress(personalKeyId, address);
+    if (chainId === "solana") await seedSolanaAddress(personalKeyId, address);
+    if (chainId === "bitcoin-cash") await seedBitcoinCashAddress(personalKeyId, address);
+    if (chainId === "monero" && moneroViewKey) {
+      await seedMoneroAddress(personalKeyId, address, moneroViewKey);
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[ingest:${chainId}] history seed failed for ${address}: ${msg}`);

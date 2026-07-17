@@ -33,15 +33,21 @@ export interface Erc20Token {
   decimals: number;
 }
 
-const DEFAULT_ERC20_TOKENS: Erc20Token[] = [
+const DEFAULT_ETHEREUM_ERC20_TOKENS: Erc20Token[] = [
   { ticker: "USDC", address: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", decimals: 6 },
   { ticker: "USDT", address: "0xdac17f958d2ee523a2206206994597c13d831ec7", decimals: 6 },
   { ticker: "DAI", address: "0x6b175474e89094c44da98b954eedeac495271d0f", decimals: 18 },
 ];
 
-function loadErc20Tokens(): Erc20Token[] {
-  const raw = process.env.ETHEREUM_ERC20_TOKENS?.trim();
-  if (!raw) return DEFAULT_ERC20_TOKENS;
+const DEFAULT_BASE_ERC20_TOKENS: Erc20Token[] = [
+  { ticker: "USDC", address: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", decimals: 6 },
+  { ticker: "DAI", address: "0x50c5725949a6f0c72e6c4a641f24049a917db0cb", decimals: 18 },
+  { ticker: "EURC", address: "0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42", decimals: 6 },
+];
+
+function loadEvmTokenList(envVarName: string, defaults: Erc20Token[]): Erc20Token[] {
+  const raw = process.env[envVarName]?.trim();
+  if (!raw) return defaults;
   return raw.split(",").map((entry) => {
     const [ticker, address, decimals] = entry.trim().split(":");
     const n = Number(decimals);
@@ -54,10 +60,41 @@ function loadErc20Tokens(): Erc20Token[] {
       n > 36
     ) {
       throw new Error(
-        `Invalid ETHEREUM_ERC20_TOKENS entry "${entry.trim()}", expected TICKER:0xaddress:decimals`,
+        `Invalid ${envVarName} entry "${entry.trim()}", expected TICKER:0xaddress:decimals`,
       );
     }
     return { ticker, address: address.toLowerCase(), decimals: n };
+  });
+}
+
+const BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]+$/;
+
+const DEFAULT_SOLANA_SPL_TOKENS: Erc20Token[] = [
+  { ticker: "USDC", address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6 },
+  { ticker: "USDT", address: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", decimals: 6 },
+];
+
+function loadSolanaTokenList(envVarName: string, defaults: Erc20Token[]): Erc20Token[] {
+  const raw = process.env[envVarName]?.trim();
+  if (!raw) return defaults;
+  return raw.split(",").map((entry) => {
+    const [ticker, mint, decimals] = entry.trim().split(":");
+    const n = Number(decimals);
+    if (
+      !ticker ||
+      !mint ||
+      mint.length < 32 ||
+      mint.length > 44 ||
+      !BASE58_RE.test(mint) ||
+      !Number.isInteger(n) ||
+      n < 0 ||
+      n > 36
+    ) {
+      throw new Error(
+        `Invalid ${envVarName} entry "${entry.trim()}", expected TICKER:mintAddress:decimals`,
+      );
+    }
+    return { ticker, address: mint, decimals: n };
   });
 }
 
@@ -67,6 +104,11 @@ const DEFAULT_PRICE_IDS: Record<string, string> = {
   USDC: "usd-coin",
   USDT: "tether",
   DAI: "dai",
+  LTC: "litecoin",
+  BCH: "bitcoin-cash",
+  SOL: "solana",
+  XMR: "monero",
+  EURC: "euro-coin",
 };
 
 function loadPriceIds(): Record<string, string> {
@@ -164,7 +206,36 @@ export const env = {
     ethereumRpcUrl: url("ETHEREUM_RPC_URL", "https://ethereum-rpc.publicnode.com"),
     ethereumPollIntervalMs: int("ETHEREUM_POLL_INTERVAL_MS", 15_000),
     ethereumMaxCatchupBlocks: int("ETHEREUM_MAX_CATCHUP_BLOCKS", 50),
-    ethereumErc20Tokens: loadErc20Tokens(),
+    ethereumErc20Tokens: loadEvmTokenList("ETHEREUM_ERC20_TOKENS", DEFAULT_ETHEREUM_ERC20_TOKENS),
+    litecoinEsploraUrl: url("LITECOIN_ESPLORA_URL", "https://litecoinspace.org/api"),
+    litecoinPollIntervalMs: int("LITECOIN_POLL_INTERVAL_MS", 30_000),
+    litecoinAddressGapMs: int("LITECOIN_ADDRESS_GAP_MS", 250),
+    baseRpcUrl: url("BASE_RPC_URL", "https://base-rpc.publicnode.com"),
+    basePollIntervalMs: int("BASE_POLL_INTERVAL_MS", 5_000),
+    baseMaxCatchupBlocks: int("BASE_MAX_CATCHUP_BLOCKS", 300),
+    baseErc20Tokens: loadEvmTokenList("BASE_ERC20_TOKENS", DEFAULT_BASE_ERC20_TOKENS),
+    solanaRpcUrl: url("SOLANA_RPC_URL", "https://solana-rpc.publicnode.com"),
+    solanaPollIntervalMs: int("SOLANA_POLL_INTERVAL_MS", 10_000),
+    solanaAddressGapMs: int("SOLANA_ADDRESS_GAP_MS", 250),
+    solanaSignaturesPerPoll: int("SOLANA_SIGNATURES_PER_POLL", 100),
+    solanaSplTokens: loadSolanaTokenList("SOLANA_SPL_TOKENS", DEFAULT_SOLANA_SPL_TOKENS),
+    bitcoinCashExplorerUrl: url(
+      "BITCOIN_CASH_EXPLORER_URL",
+      "https://api.blockchair.com/bitcoin-cash",
+    ),
+    bitcoinCashExplorerApiKey: process.env.BITCOIN_CASH_EXPLORER_API_KEY,
+    bitcoinCashPollIntervalMs: int("BITCOIN_CASH_POLL_INTERVAL_MS", 120_000),
+    bitcoinCashAddressGapMs: int("BITCOIN_CASH_ADDRESS_GAP_MS", 2_000),
+    moneroWalletRpcPath: process.env.MONERO_WALLET_RPC_PATH ?? "monero-wallet-rpc",
+    // No hardcoded default: public remote nodes churn and go offline, and
+    // shipping specific hostnames here risks silently pointing at dead or
+    // untrustworthy infra. Operators must pick current nodes themselves,
+    // e.g. from https://monero.fail or https://xmr.ditatompel.com/remote-nodes.
+    moneroRemoteNodes: (process.env.MONERO_REMOTE_NODES ?? "")
+      .split(",")
+      .map((n) => n.trim())
+      .filter(Boolean),
+    moneroPollIntervalMs: int("MONERO_POLL_INTERVAL_MS", 60_000),
     maxAgeDays: int("INGEST_MAX_AGE_DAYS", 7),
   },
 

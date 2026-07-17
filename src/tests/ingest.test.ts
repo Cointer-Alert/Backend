@@ -6,7 +6,7 @@ process.env.WATCHERS_ENABLED = "false";
 const { connectDb, getDb, now } = await import("../db/client");
 const { bitcoin } = await import("../chains/bitcoin");
 const { processIncomingTxs } = await import("../services/ingestService");
-const { parseEsploraTxs } = await import("../ingest/bitcoinWatcher");
+const { parseEsploraTxs } = await import("../ingest/esploraCommon");
 const { parseEthBlock, parseErc20Logs } = await import("../ingest/ethereumWatcher");
 const { getCursor, setCursor } = await import("../ingest/state");
 
@@ -17,17 +17,22 @@ const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a
 
 describe("parseEsploraTxs", () => {
   test("sums multiple vouts paying the watched address", () => {
-    const txs = parseEsploraTxs(ADDR, [
-      {
-        txid: "aa11",
-        vout: [
-          { scriptpubkey_address: ADDR, value: 300_000 },
-          { scriptpubkey_address: "bc1qother", value: 999 },
-          { scriptpubkey_address: ADDR, value: 200_000 },
-        ],
-        status: { confirmed: true, block_time: 1_700_000_000 },
-      },
-    ]);
+    const txs = parseEsploraTxs(
+      ADDR,
+      [
+        {
+          txid: "aa11",
+          vout: [
+            { scriptpubkey_address: ADDR, value: 300_000 },
+            { scriptpubkey_address: "bc1qother", value: 999 },
+            { scriptpubkey_address: ADDR, value: 200_000 },
+          ],
+          status: { confirmed: true, block_time: 1_700_000_000 },
+        },
+      ],
+      "BTC",
+      8,
+    );
     expect(txs).toHaveLength(1);
     expect(txs[0]!.amount).toBe("0.005");
     expect(txs[0]!.asset).toBe("BTC");
@@ -35,57 +40,77 @@ describe("parseEsploraTxs", () => {
   });
 
   test("excludes txs that pay the address nothing", () => {
-    const txs = parseEsploraTxs(ADDR, [
-      {
-        txid: "bb22",
-        vout: [{ scriptpubkey_address: "bc1qother", value: 5000 }],
-        status: { confirmed: true },
-      },
-    ]);
+    const txs = parseEsploraTxs(
+      ADDR,
+      [
+        {
+          txid: "bb22",
+          vout: [{ scriptpubkey_address: "bc1qother", value: 5000 }],
+          status: { confirmed: true },
+        },
+      ],
+      "BTC",
+      8,
+    );
     expect(txs).toHaveLength(0);
   });
 
   test("unconfirmed txs carry no timestamp", () => {
-    const txs = parseEsploraTxs(ADDR, [
-      {
-        txid: "cc33",
-        vout: [{ scriptpubkey_address: ADDR, value: 1000 }],
-        status: { confirmed: false },
-      },
-    ]);
+    const txs = parseEsploraTxs(
+      ADDR,
+      [
+        {
+          txid: "cc33",
+          vout: [{ scriptpubkey_address: ADDR, value: 1000 }],
+          status: { confirmed: false },
+        },
+      ],
+      "BTC",
+      8,
+    );
     expect(txs[0]!.timestamp).toBeUndefined();
   });
 
   test("tolerates OP_RETURN vouts without an address", () => {
-    const txs = parseEsploraTxs(ADDR, [
-      {
-        txid: "dd44",
-        vout: [{ value: 0 }, { scriptpubkey_address: ADDR, value: 2500 }],
-        status: { confirmed: true, block_time: 1_700_000_001 },
-      },
-    ]);
+    const txs = parseEsploraTxs(
+      ADDR,
+      [
+        {
+          txid: "dd44",
+          vout: [{ value: 0 }, { scriptpubkey_address: ADDR, value: 2500 }],
+          status: { confirmed: true, block_time: 1_700_000_001 },
+        },
+      ],
+      "BTC",
+      8,
+    );
     expect(txs).toHaveLength(1);
     expect(txs[0]!.amount).toBe("0.000025");
   });
 
   test("excludes self-spends, change back to the watched address is not a donation", () => {
-    const txs = parseEsploraTxs(ADDR, [
-      {
-        txid: "ee55",
-        vin: [{ prevout: { scriptpubkey_address: ADDR } }],
-        vout: [
-          { scriptpubkey_address: "bc1qpayee", value: 50_000 },
-          { scriptpubkey_address: ADDR, value: 40_000 },
-        ],
-        status: { confirmed: true, block_time: 1_700_000_002 },
-      },
-      {
-        txid: "ff66",
-        vin: [{ prevout: { scriptpubkey_address: "bc1qdonor" } }, { prevout: null }],
-        vout: [{ scriptpubkey_address: ADDR, value: 10_000 }],
-        status: { confirmed: true, block_time: 1_700_000_003 },
-      },
-    ]);
+    const txs = parseEsploraTxs(
+      ADDR,
+      [
+        {
+          txid: "ee55",
+          vin: [{ prevout: { scriptpubkey_address: ADDR } }],
+          vout: [
+            { scriptpubkey_address: "bc1qpayee", value: 50_000 },
+            { scriptpubkey_address: ADDR, value: 40_000 },
+          ],
+          status: { confirmed: true, block_time: 1_700_000_002 },
+        },
+        {
+          txid: "ff66",
+          vin: [{ prevout: { scriptpubkey_address: "bc1qdonor" } }, { prevout: null }],
+          vout: [{ scriptpubkey_address: ADDR, value: 10_000 }],
+          status: { confirmed: true, block_time: 1_700_000_003 },
+        },
+      ],
+      "BTC",
+      8,
+    );
     expect(txs).toHaveLength(1);
     expect(txs[0]!.txHash).toBe("ff66");
   });

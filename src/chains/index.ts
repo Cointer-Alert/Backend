@@ -1,6 +1,11 @@
 import { env } from "../config/env";
+import { base } from "./base";
 import { bitcoin } from "./bitcoin";
+import { bitcoinCash } from "./bitcoinCash";
 import { ethereum } from "./ethereum";
+import { litecoin } from "./litecoin";
+import { monero } from "./monero";
+import { solana } from "./solana";
 
 export interface ChainAdapter {
   id: string;
@@ -13,6 +18,11 @@ export interface ChainAdapter {
 const registry: Record<string, ChainAdapter> = {
   [bitcoin.id]: bitcoin,
   [ethereum.id]: ethereum,
+  [litecoin.id]: litecoin,
+  [base.id]: base,
+  [solana.id]: solana,
+  [bitcoinCash.id]: bitcoinCash,
+  [monero.id]: monero,
 };
 
 export function getEnabledChains(): ChainAdapter[] {

@@ -31,9 +31,12 @@ export async function fetchNativePrices(ids: string[]): Promise<Record<string, n
   return flatten(data);
 }
 
-export async function fetchTokenPrices(addresses: string[]): Promise<Record<string, number>> {
+export async function fetchTokenPrices(
+  platformId: string,
+  addresses: string[],
+): Promise<Record<string, number>> {
   if (addresses.length === 0) return {};
-  const data = await get<PriceResponse>("/simple/token_price/ethereum", {
+  const data = await get<PriceResponse>(`/simple/token_price/${platformId}`, {
     contract_addresses: addresses.join(","),
     vs_currencies: env.prices.currency,
   });

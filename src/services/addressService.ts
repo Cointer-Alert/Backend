@@ -19,12 +19,15 @@ export function listAddresses(personalKeyId: string) {
   }));
 }
 
+const MONERO_VIEW_KEY_RE = /^[0-9a-fA-F]{64}$/;
+
 export function addAddress(
   personalKeyId: string,
   chainId: unknown,
   rawAddress: unknown,
   label: unknown,
   isAdmin = false,
+  viewKey?: unknown,
 ) {
   if (typeof chainId !== "string") throw new ValidationError("chain is required");
   const chain = getChain(chainId);
@@ -34,6 +37,11 @@ export function addAddress(
   }
   if (label !== undefined && label !== null && (typeof label !== "string" || label.length > 100)) {
     throw new ValidationError("label must be a string of at most 100 characters");
+  }
+  if (chain.id === "monero") {
+    if (typeof viewKey !== "string" || !MONERO_VIEW_KEY_RE.test(viewKey)) {
+      throw new ValidationError("viewKey is required for Monero and must be a 64-char hex string");
+    }
   }
   const address = chain.normalize(rawAddress.trim());
 
@@ -62,6 +70,13 @@ export function addAddress(
     "INSERT INTO addresses (id, personal_key_id, chain, address, label, created_at) VALUES (?, ?, ?, ?, ?, ?)",
     [id, personalKeyId, chain.id, address, (label as string | null) ?? null, createdAt],
   );
+  if (chain.id === "monero") {
+    db.run("INSERT INTO monero_watch_keys (address_id, view_key, created_at) VALUES (?, ?, ?)", [
+      id,
+      (viewKey as string).toLowerCase(),
+      createdAt,
+    ]);
+  }
   return { id, chain: chain.id, address, label: (label as string | null) ?? null, createdAt };
 }
 
@@ -103,4 +118,17 @@ export function listAllWatchedAddresses(chainId: string): string[] {
     .query<{ address: string }, [string]>("SELECT DISTINCT address FROM addresses WHERE chain = ?")
     .all(chainId)
     .map((r) => r.address);
+}
+
+/** One view key per distinct Monero address (addresses can be watched by multiple keys). */
+export function listMoneroWatchTargets(): { address: string; viewKey: string }[] {
+  return getDb()
+    .query<{ address: string; view_key: string }, []>(
+      `SELECT DISTINCT a.address, k.view_key
+       FROM addresses a
+       JOIN monero_watch_keys k ON k.address_id = a.id
+       WHERE a.chain = 'monero'`,
+    )
+    .all()
+    .map((r) => ({ address: r.address, viewKey: r.view_key }));
 }
