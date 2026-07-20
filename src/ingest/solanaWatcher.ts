@@ -161,7 +161,7 @@ export async function fetchSolanaBalances(
   tokens: Erc20Token[],
 ): Promise<SolanaBalance[]> {
   const [lamportsResult, ...tokenResults] = await Promise.allSettled([
-    rpc<number>(rpcUrl, "getBalance", [address]),
+    rpc<{ value: number }>(rpcUrl, "getBalance", [address]),
     ...tokens.map((token) =>
       rpc<TokenAccountsResponse>(rpcUrl, "getTokenAccountsByOwner", [
         address,
@@ -175,7 +175,7 @@ export async function fetchSolanaBalances(
   if (lamportsResult.status === "fulfilled") {
     balances.push({
       asset: "SOL",
-      raw: BigInt(lamportsResult.value),
+      raw: BigInt(lamportsResult.value.value),
       decimals: LAMPORTS_PER_SOL_DECIMALS,
     });
   } else {
